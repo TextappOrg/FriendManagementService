@@ -73,7 +73,7 @@ public class ControllerFriends {
                                 "\" hacking\"").type(MediaType.TEXT_HTML).build();
                 else return Response.noContent().entity("Something went wrong " + s).type(MediaType.TEXT_HTML).build();
             }
-        } catch (NamingException e) {
+        } catch (NamingException | InterruptedException | ExecutionException e) {
             e.printStackTrace(); // TODO : debug
             return Response.serverError().build();
         }
