@@ -2,20 +2,23 @@ package DaoPackage;
 
 import ModelPackage.FriendListModel;
 import ModelPackage.FriendsModel;
+import UtilityPackage.MakeHttpRequest;
 import UtilityPackage.MongoDbConnectionClass;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Filters;
 import org.bson.Document;
 import org.bson.conversions.Bson;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import javax.naming.NamingException;
+import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static com.mongodb.client.model.Updates.addToSet;
 
@@ -56,7 +59,6 @@ public class DaoFriends implements DaoFriendsInterface {
     @Override
     @SuppressWarnings(value = "unchecked")
     public HashSet<String> confirmFriendRequest(String status) throws NamingException, ExecutionException, InterruptedException {
-
         HashSet<String> returnSet = new HashSet<>();
         ExecutorService executorService = Executors.newCachedThreadPool();
         if(!isUserLoggedIn(this.friendsModel.getFriendUid())) returnSet.add("Please login to confirm and refrain from" +
@@ -208,6 +210,7 @@ public class DaoFriends implements DaoFriendsInterface {
                 mc.updateOne(new Document("_id", this.friendsModel.getFriendUid()), addToFriendList);
             });
 
+            cachedThreadPool.execute(this::sendFriendAddNotification);
             return true;
         } catch (com.mongodb.MongoWriteException e) {
             e.printStackTrace(); // TODO : debug
@@ -295,12 +298,27 @@ public class DaoFriends implements DaoFriendsInterface {
         return false;
     }
 
-    private boolean ifExistsInFriendList(String adder, String friend)throws NamingException{
+    private boolean ifExistsInFriendList(String adder, String friend)throws NamingException {
         MongoCollection mc = MongoDbConnectionClass.getMongoDocFriendsOfUsers();
         Bson filterInAdderList = new Document("_id",adder).append("Friends",new Document("uId",friend));
         Document resultFilterInAdderList = (Document) mc.find(filterInAdderList).limit(1).first();
         if (resultFilterInAdderList != null) return !resultFilterInAdderList.isEmpty();
         return false;
+    }
+
+    private void sendFriendAddNotification() {
+        String uid = this.friendsModel.getFriendUid();
+        String messageTitle = "FRND_REQ";
+        String messageBody = this.friendsModel.getAdderUid();
+        final Map<String,String> paramMap = new HashMap<>();
+        paramMap.put("uId",uid);
+        paramMap.put("body",messageBody);
+        paramMap.put("title",messageTitle);
+        try {
+            new MakeHttpRequest(paramMap).makePostRequestToFireBase();
+        } catch (IOException e) {
+            e.printStackTrace(); // TODO : debug
+        }
     }
 
 
